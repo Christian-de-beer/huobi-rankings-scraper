@@ -1,10 +1,35 @@
+// 
+// Author : Christian de Beer
+//
+//
 var cron = require('node-cron')
+const fs = require("fs");
+const { exit } = require('process');
 const webdriver = require('selenium-webdriver'),
     By = webdriver.By,
     until = webdriver.until;
 
 
+// Page URL
 let url = "https://www.huobi.com/en-us/grid-exchange/rank/"
+let fileName = "huobiRankings.csv"
+
+/* File Path Discovery */
+const createCsvWriter = require('csv-writer').createObjectCsvWriter;
+const csvWriter = createCsvWriter({
+    path: fileName,
+    append: fs.existsSync(fileName),
+    header: [
+        { id: "Date", title: "Date" },
+        { id: 'Pairs', title: 'Pairs' },
+        { id: 'Price Range', title: 'Price Range' },
+        { id: 'Last Price', title: 'Last Price' },
+        { id: 'Quantity', title: 'Quantity' },
+        { id: 'Profit Margin Per Grid', title: 'Profit Margin Per Grid' },
+        { id: 'Backtested 7D Annual Yield', title: 'Backtested 7D Annual Yield' },
+        { id: 'Action', title: 'Action' },
+    ]
+});
 
 const driver = new webdriver.Builder()
     .forBrowser('chrome')
@@ -17,13 +42,55 @@ driver.get(url);
 
 console.log("... Page loaded ... ");
 
-cron.schedule('*/30 * * * * *', () => {
+cron.schedule('*/25 * * * * *', () => {
     console.clear()
     console.log("... Cron Running ... ");
-    scrapeWebPage(driver)
+    scrapeWebPageToCSV(driver)
 });
 
-seconds = 30;
+/* Version 2.0 - Scrape webpage and write CSV file */
+function scrapeWebPageToCSV(driver) {
+    driver.navigate().refresh().then(() => {
+        webPageReady(driver).then(() => {
+
+            // Get the elements that contain the data
+            var pendingElements = driver.findElements(By.className('dd-ai'))
+            pendingElements.then(function (rankings) {
+                for (let index = 0; index < rankings.length; index++) {
+                    const ranking = rankings[index];
+                    ranking.getText().then((content) => {
+                        let contentArray = content.split("\n")
+
+                        let date = new Date().toUTCString().split(", ")[1]
+                        if (isNaN(contentArray[0])) {
+                            contentArray.unshift(date)
+                        } else {
+                            contentArray[0] = date
+                        }
+
+                        const data = [
+                            {
+                                'Date': contentArray[0],
+                                'Pairs': contentArray[1],
+                                'Price Range': contentArray[2],
+                                'Last Price': contentArray[3],
+                                'Quantity': contentArray[4],
+                                'Profit Margin Per Grid': contentArray[5],
+                                'Backtested 7D Annual Yield': contentArray[6],
+                                'Action': contentArray[7]
+                            }]
+
+                        csvWriter
+                            .writeRecords(data)
+                            .then(() => console.log('The ranking was written successfully'));
+
+                    })
+                };
+
+            });
+        })
+    })
+}
 
 // Object to use in calculating the differance... 
 zksCollection = []
@@ -297,6 +364,11 @@ function scrapeWebPage(driver) {
         })
     })
 }
+
+
+
+
+
 
 async function webPageReady(driver) {
     await driver.wait(until.elementLocated(By.className('dt-ai')), 10000);
