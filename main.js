@@ -1,10 +1,11 @@
 // 
 // Author : Christian de Beer
-//
+// Scraping of Huobi TOP20 bot rankings every 20 seconds and writing to csv file. 
 //
 var cron = require('node-cron')
 const fs = require("fs");
 const { exit } = require('process');
+const chrome = require('selenium-webdriver/chrome');
 const webdriver = require('selenium-webdriver'),
     By = webdriver.By,
     until = webdriver.until;
@@ -33,6 +34,7 @@ const csvWriter = createCsvWriter({
 
 const driver = new webdriver.Builder()
     .forBrowser('chrome')
+    .setChromeOptions(new chrome.Options().headless())
     .build();
 
 
